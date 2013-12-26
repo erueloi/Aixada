@@ -337,7 +337,7 @@
 
 					$.ajax({
 						type: "POST",
-						url: "php/ctrl/Account.php?oper=depositCashForUf&account_id="+uf_account_id+"&quantity="+quantity+"&description="+description,
+						url: "php/ctrl/Account.php?oper=deposit&account_id="+uf_account_id+"&quantity="+quantity+"&description="+description,
 						beforeSend : function (){
 							$('#deposit .loadSpinner').show();
 						},
@@ -372,7 +372,7 @@
 					params	: 'oper=latestMovements',
 					loadOnInit: true,
 					rowComplete : function (rowIndex, row){
-						$.formatQuantity(row, "<?=$Text['currency_sign'];?>");
+						$.formatQuantity(row);
 					},
 					complete : function (rowCount){
 						$('#list_account tbody tr:even').addClass('rowHighlight');
@@ -415,9 +415,6 @@
                     autoReload: 103020,
                     beforeLoad : function(){
 						$('#negative_ufs .loadSpinner').show();
-					},
-					rowComplete : function (rowIndex, row){
-						$.formatQuantity(row, "<?=$Text['currency_sign'];?>");
 					},
 					complete : function(){
 						$('#negative_ufs .loadSpinner').hide();
@@ -512,7 +509,7 @@
 
 						if (searchStr.length >= minLength){
 						  	$('#product_list_search tbody').xml2html('reload',{
-								params: 'oper=getShopProducts&date=0&like='+searchStr,
+								params: 'oper=getShopProducts&stock_available=1&date=0&like='+searchStr,
 								rowComplete : function(rowIndex, row){	//updates quantities for items already in cart
 									var id =  $(row).attr("id");
 									var qu = $("#cart_quantity_"+id).val();
@@ -857,7 +854,7 @@
 								<th><?=$Text['uf_short'];?></th>
 								<th class="textAlignCenter"><?=$Text['date_of_purchase'];?></th>
 								<th class="textAlignCenter"><?=$Text['validated'];?></th>
-								<th><p class="textAlignRight"><?=$Text['total'];?>&nbsp;</p></th>
+								<th class="textAlignRight"><?=$Text['total'];?></th>
 							</tr>
 						</thead>
 						<tbody>
@@ -866,7 +863,7 @@
 								<td>{uf_id}</td>
 								<td>{date_for_shop}</td>
 								<td>{ts_validated}</td>
-								<td><p class="textAlignRight">{purchase_total} <?php echo $Text['currency_sign'];?></p></td>
+								<td><p class="textAlignRight">{purchase_total}€</p></td>
 							</tr>
 						</tbody>
 					</table>
@@ -891,7 +888,7 @@
 								<tr>
 									<td><p class="textAlignRight">{uf}</p></td>
 									<td><p class="textAlignLeft">{name}</p></td>
-									<td><p class="textAlignRight"><span class="formatQty">{balance}</span></p></td>
+									<td><p class="textAlignRight"><span class="negativeBalance">{balance}</span></p></td>
 									<td>{last_update}</td>
 								</tr>
 							</tbody>
@@ -972,7 +969,7 @@
 				<td>{id}</td>
 				<td class="textAlignCenter">{date_for_shop}</td>
 				<td class="textAlignCenter">{ts_validated}</td>
-				<td class="textAlignRight">{purchase_total}<?php echo $Text['currency_sign'];?></td>
+				<td class="textAlignRight">{purchase_total}€</td>
 			</tr>
 		</tbody>
 	</table>
