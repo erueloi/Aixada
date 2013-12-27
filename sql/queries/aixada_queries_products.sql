@@ -432,6 +432,128 @@ begin
 end|
 
 
+/*************************************** **/
+
+begin
+   
+   declare today date default
+		date(sysdate());
+	   declare wherec varchar(255);
+	   declare fromc varchar(255);
+	   declare fieldc varchar(255);
+	   
+   set wherec =
+if(include_inactive=1,"","and
+p.active=1 and pv.active = 1");    
+           
+   
+   if the_date = 0 then
+       set fieldc = "";
+       set fromc = "";
+       set wherec =    concat(wherec, "
+and p.unit_measure_shop_id = u.id ");
+   
+       
+   elseif the_date = '1234­01­01' then 
+       set fieldc = "";
+       set fromc = "";
+       set wherec = concat(wherec, " and
+p.unit_measure_shop_id = u.id and
+(p.orderable_type_id = 1 or
+p.orderable_type_id = 4)");
+   
+   
+   else 
+       set fieldc = concat(",
+datediff(po.closing_date, '",today,"') as
+time_left");
+         set fromc =
+   "aixada_product_orderable_for_date
+po, ";
+       set wherec =    concat(wherec, "
+and po.date_for_order = '",the_date,"'
+and po.product_id = p.id and
+p.unit_measure_order_id = u.id ");    
+   end if;
+      
+   
+   
+   if the_product_id > 0 then 
+       set wherec = concat(wherec, " and
+p.id = '", the_product_id, "' ");
+       
+   
+   elseif the_provider_id > 0 then
+       set wherec = concat(wherec, " and
+pv.id = '", the_provider_id, "' ");
+       
+   
+   elseif the_category_id > 0 then 
+       set fromc = concat(fromc,
+"aixada_product_category pc,");
+       set wherec = concat(wherec, " and
+pc.id = '", the_category_id, "' and
+p.category_id = pc.id ");
+   
+   
+   elseif the_like != "" then
+       set wherec    = concat(wherec, "
+and p.name LIKE '%", the_like,"%' ");
+       
+   end if;
+   
+   if stock_available=1 then
+       set fieldc = concat(fieldc, " ,
+(p.stock_actual ­ IFNULL((select
+sum(quantity) from aixada_cart ac,
+aixada_shop_item asi where ac.id =
+asi.cart_id and ac.ts_validated = 0 and
+asi.product_id = p.id),0)) as
+stock_actual ");
+       set wherec = concat(wherec, " and
+(p.stock_actual ­ (select
+IFNULL(sum(quantity),0) from
+aixada_cart ac, aixada_shop_item asi
+where ac.id = asi.cart_id and
+ac.ts_validated = 0 and asi.product_id
+= p.id)) > 0 ");
+   end if;
+   
+ 
+   set @q = concat("
+   select
+       p.*,
+       round((p.unit_price * (1 +
+iva.percent/100) * (1 +
+t.rev_tax_percent/100)),2) as
+unit_price,
+       p.unit_price as unit_price_netto, 
+       p.unit_price as unit_price_netto, 
+       pv.name as provider_name,    
+       u.unit,
+       iva.percent as iva_percent,
+       t.rev_tax_percent
+       ",fieldc,"
+   from
+       ",fromc,"
+       aixada_product p,
+       aixada_provider pv, 
+       aixada_rev_tax_type t,
+       aixada_iva_type iva,
+       aixada_unit_measure u        
+   where 
+       pv.id = p.provider_id    
+       ",wherec,"
+       and p.rev_tax_type_id = t.id
+       and p.iva_percent_id = iva.id 
+   order by p.name asc, p.id asc;");
+   
+   prepare st from @q;
+     execute st;
+     deallocate prepare st;
+ 
+end |
+
 
 /**
  *  returns all products (with details). This query is needed for the shop/order pages and its
@@ -456,7 +578,8 @@ create procedure get_products_detail(	in the_provider_id int,
 										in the_like varchar(255),
 										in the_date date,
 										in include_inactive boolean,
-										in the_product_id int)
+										in the_product_id int,
+										in stock_available boolean)
 begin
 	
 	declare today date default date(sysdate());
@@ -487,8 +610,7 @@ begin
        	set fromc = 	"aixada_product_orderable_for_date po, ";
     	set wherec = 	concat(wherec, " and po.date_for_order = '",the_date,"' and po.product_id = p.id and p.unit_measure_order_id = u.id ");	
     end if;
-     
-    
+        
     
     /** get a specific product **/
     if the_product_id > 0 then 
@@ -505,12 +627,15 @@ begin
 	
     /** search for product name **/
     elseif the_like != "" then
-    	set wherec 	= concat(wherec, " and p.name LIKE '%", the_like,"%' ");
-    	
+    	set wherec = concat(wherec, " and p.name LIKE '%", the_like,"%' ");
     end if;
-    
-  
-	set @q = concat("
+
+    if stock_available = 1 then
+	set fieldc = concat(fieldc, " ,(p.stock_actual - (select IFNULL(sum(quantity),0) from aixada_cart ac, aixada_shop_item asi where ac.id = asi.cart_id and ac.ts_validated = 0 and asi.product_id = p.id)) as stock_actual ");
+	set wherec = concat(wherec, " and stock_actual > 0 ");
+    end if;
+     
+  	set @q = concat("
 	select
 		p.*,
 		round((p.unit_price * (1 + iva.percent/100) * (1 + t.rev_tax_percent/100)),2) as unit_price,
@@ -538,7 +663,7 @@ begin
   	execute st;
   	deallocate prepare st;
   
-end|
+end |
 
 
 /**
@@ -610,50 +735,6 @@ begin
   	order by p.id, p.name;
 end|
 
-
-/**
- * retrieves the value of available stock for the given product or provider in given date range
- */
-drop procedure if exists get_stock_value|
-create procedure get_stock_value(in the_provider_id int)
-begin
-	
-	declare wherec varchar(255) default "";
-	
-	if (the_provider_id > 0) then
-		set wherec = concat("and p.provider_id=",the_provider_id);
-	end if; 
-	
-	set @q = concat("select
-		p.id as product_id, 
-		p.stock_actual,
-		p.orderable_type_id,
-		p.name,	
-		p.unit_price,
-		round((p.stock_actual * p.unit_price),2) as total_netto_stock_value,
-		round((p.stock_actual * p.unit_price * (1 + iva.percent/100) * (1 + rev.rev_tax_percent/100)),2) as total_brutto_stock_value,
-		iva.percent as iva_percent,
-		rev.rev_tax_percent,
-		u.unit as shop_unit
-	from 
-		aixada_product p,
-		aixada_iva_type iva,
-		aixada_rev_tax_type rev,
-		aixada_unit_measure u
-	where 
-		p.active = 1	
-		and p.rev_tax_type_id = rev.id
-		and p.iva_percent_id = iva.id
-		and p.unit_measure_shop_id = u.id
-		",wherec,"
-		and p.orderable_type_id = 1;");
-		
-		
-	prepare st from @q;
-  	execute st;
-  	deallocate prepare st;
-	
-end|
 
 
 /**
@@ -802,23 +883,20 @@ end|
  * or all products. 
  */
 drop procedure if exists stock_movements|
-create procedure stock_movements(in the_product_id int, in the_provider_id int, in the_limit varchar(255))
+create procedure stock_movements(in the_product_id int, in the_limit varchar(255))
 begin
   
-	declare wherec varchar(255) default ""; 
-
-	if (the_provider_id > 0) then
-		set wherec = concat(" and p.id = sm.product_id and p.provider_id = ", the_provider_id);
-	elseif (the_product_id > 0) then
-		set wherec = concat(" and p.id = ", the_product_id, " and sm.product_id = p.id ");
+	declare wherec varchar(255) default ''; 
+	
+	if (the_product_id > 0) then
+		set wherec = concat('and sm.product_id = ', the_product_id);
 	end if; 
 	
-	set @q = concat("select
+	select 
 		sm.*,
 		mem.id as member_id,
 		mem.name as member_name,
 		p.name as product_name,
-		p.id as product_id,
 		calc_delta_price(sm.amount_difference, p.unit_price, iva.percent) as delta_price,
 		um.unit
 	from
@@ -829,15 +907,12 @@ begin
 		aixada_unit_measure um
 	where
 		mem.id = sm.operator_id
-		",wherec," 
+		and p.id = sm.product_id
 		and p.unit_measure_shop_id = um.id
 		and p.iva_percent_id = iva.id
+		and sm.product_id = the_product_id
 	order by
-		sm.product_id desc, sm.ts desc;");
-		
-	prepare st from @q;
-  	execute st;
-  	deallocate prepare st;
+		sm.ts desc, sm.product_id desc;  
 		
 end|
 
