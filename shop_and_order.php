@@ -117,6 +117,9 @@
 							offSet : 1
 				}).change(function(){
 					var id = $("option:selected", this).val();					//get the id of the provider
+					var stock = '0'
+					if(what=='Shop'){
+						stock = '1';}
 					$('#product_list_provider tbody').xml2html('removeAll');	//empty the list
 					$('#providerClosedStatus').hide();
 					counterClosed = 0;
@@ -126,7 +129,7 @@
 					$('.loadSpinner').show();
 					//alert($.getSelectedDate('#datepicker','',what)); //for shop the date needs to be 0!!
 					$('#product_list_provider tbody').xml2html("reload",{
-						params: 'oper=get'+what+'Products&provider_id='+id+'&date='+$.getSelectedDate('#datepicker','',what),
+						params: 'oper=get'+what+'Products&stock_available='+stock+'&provider_id='+id+'&date='+$.getSelectedDate('#datepicker','',what),
 						rowComplete : function(rowIndex, row){	//updates quantities for items already in cart
 							formatRow(row);
 						},
@@ -156,13 +159,17 @@
 		}).change(function(){
 					//get the id of the provider
 					var id = $("option:selected", this).val();
+					var stock = '0'
+					if(what=='Shop'){
+						stock = '1';}
+					
 					$('#product_list_category tbody').xml2html('removeAll');
 
 					if (id < 0) {return true;}
 
 					$('.loadSpinner').show();
 					$('#product_list_category tbody').xml2html("reload",{
-						params: 'oper=get'+what+'Products&category_id='+id+'&date='+$.getSelectedDate('#datepicker','',what),
+						params: 'oper=get'+what+'Products&stock_available='+stock+'&category_id='+id+'&date='+$.getSelectedDate('#datepicker','',what),
 						rowComplete : function(rowIndex, row){	//updates quantities for items already in cart
 							formatRow(row);
 						},
@@ -187,8 +194,11 @@
 
 				if (searchStr.length >= minLength){
 					$('.loadSpinner').show();
+					var stock = '0'
+					if(what=='Shop'){
+						stock = '1';}
 				  	$('#product_list_search tbody').xml2html("reload",{
-						params: 'oper=get'+what+'Products&date='+$.getSelectedDate('#datepicker','',what)+'&like='+searchStr,
+						params: 'oper=get'+what+'Products&stock_available='+stock+'&date='+$.getSelectedDate('#datepicker','',what)+'&like='+searchStr,
 						rowComplete : function(rowIndex, row){	//updates quantities for items already in cart
 							formatRow(row);
 						},
